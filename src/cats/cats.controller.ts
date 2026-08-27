@@ -1,7 +1,10 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, Version } from '@nestjs/common';
 import { CreateCatDto } from './create-cat.dto';
 
-@Controller('cats')
+@Controller({
+  path: 'cats',
+  version: '1', // 👈 Pass the version here for the whole controller
+})
 export class CatsController {
   @Post()
   create(): string {
