@@ -1,28 +1,57 @@
-import { Controller, Get, Param, Post, Query, Version } from '@nestjs/common';
-import { CreateCatDto } from './create-cat.dto';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { CatsService } from './cats.service';
+import { CreateCatDto } from './dto/create-cat.dto';
+import { UpdateCatDto } from './dto/update-cat.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { Request } from 'express';
 
-@Controller({
-  path: 'cats',
-  version: '1', // 👈 Pass the version here for the whole controller
-})
+@UseGuards(JwtAuthGuard)
+@Controller({ path: 'cats', version: '1' })
 export class CatsController {
-  @Post()
-  create(): string {
-    return 'This action adds a new cat';
-  }
+  constructor(private readonly catsService: CatsService) {}
 
-  @Get(':id')
-  findOne(@Param() params: any): string {
-    console.log(params.id);
-    return `This action returns a #${params.id} cat`;
+  @Post()
+  create(@Req() req: Request, @Body() dto: CreateCatDto) {
+    const userId = req.user!.id;
+    return this.catsService.create(userId, dto);
   }
 
   @Get()
-  async findAll(@Query('age') age?: number, @Query('breed') breed?: string) {
-    if (age !== undefined || breed !== undefined) {
-      return `This action returns all cats filtered by age: ${age} and breed: ${breed}`;
-    }
+  findAll(@Req() req: Request) {
+    const userId = req.user!.id;
+    return this.catsService.findAllByUser(userId);
+  }
 
-    return 'This action returns all cats';
+  @Get(':id')
+  findOne(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
+    const userId = req.user!.id;
+    return this.catsService.findOneByUser(id, userId);
+  }
+
+  @Patch(':id')
+  update(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCatDto,
+  ) {
+    const userId = req.user!.id;
+    return this.catsService.updateByUser(id, userId, dto);
+  }
+
+  @Delete(':id')
+  remove(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
+    const userId = req.user!.id;
+    return this.catsService.removeByUser(id, userId);
   }
 }
