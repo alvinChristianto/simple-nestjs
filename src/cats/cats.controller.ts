@@ -14,7 +14,7 @@ import { CatsService } from './cats.service';
 import { CreateCatDto } from './dto/create-cat.dto';
 import { UpdateCatDto } from './dto/update-cat.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Request } from 'express';
+import type { Request } from 'express';
 
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'cats', version: '1' })
@@ -23,19 +23,19 @@ export class CatsController {
 
   @Post()
   create(@Req() req: Request, @Body() dto: CreateCatDto) {
-    const userId = (req.user as { id: number }).id;
+    const userId = req.user!.id;
     return this.catsService.create(userId, dto);
   }
 
   @Get()
   findAll(@Req() req: Request) {
-    const userId = (req.user as { id: number }).id;
+    const userId = req.user!.id;
     return this.catsService.findAllByUser(userId);
   }
 
   @Get(':id')
   findOne(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
-    const userId = (req.user as { id: number }).id;
+    const userId = req.user!.id;
     return this.catsService.findOneByUser(id, userId);
   }
 
@@ -45,13 +45,13 @@ export class CatsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCatDto,
   ) {
-    const userId = (req.user as { id: number }).id;
+    const userId = req.user!.id;
     return this.catsService.updateByUser(id, userId, dto);
   }
 
   @Delete(':id')
   remove(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
-    const userId = (req.user as { id: number }).id;
+    const userId = req.user!.id;
     return this.catsService.removeByUser(id, userId);
   }
 }
