@@ -109,6 +109,9 @@ Get a token via `POST /auth/login` or `POST /auth/register`.
 
 ## Cats (requires Bearer token, scoped to authenticated user)
 
+Cats are the patients. Each cat belongs to the authenticated user and may be
+assigned to one of that user's owners.
+
 ### GET /cats
 
 **Response (200):**
@@ -121,6 +124,11 @@ Get a token via `POST /auth/login` or `POST /auth/register`.
     "age": 3,
     "breed": "Persian",
     "userId": 1,
+    "ownerId": 2,
+    "owner": { "id": 2, "name": "Alice", "phone": null, "address": null, "userId": 1, "createdAt": "...", "updatedAt": "..." },
+    "illnesses": [
+      { "id": 1, "name": "Flu", "description": "Mild", "diagnosedAt": "2026-08-01T00:00:00.000Z", "catId": 1, "userId": 1, "createdAt": "...", "updatedAt": "..." }
+    ],
     "createdAt": "...",
     "updatedAt": "..."
   }
@@ -129,40 +137,30 @@ Get a token via `POST /auth/login` or `POST /auth/register`.
 
 ### POST /cats
 
-**Request:**
+**Request (`ownerId` optional, must belong to the authenticated user):**
 
 ```json
 {
-  "name": "Whiskers",
-  "age": 3,
-  "breed": "Persian"
-}
-```
-
-**Response (201):**
-
-```json
-{
-  "id": 1,
   "name": "Whiskers",
   "age": 3,
   "breed": "Persian",
-  "userId": 1,
-  "createdAt": "...",
-  "updatedAt": "..."
+  "ownerId": 2
 }
 ```
 
+**Response (201):** The cat object (id, name, age, breed, userId, ownerId,
+`owner`, `illnesses`, createdAt, updatedAt).
+
 ### GET /cats/:id
 
-**Response (200):** Single cat object
+**Response (200):** Single cat object, including `owner` and `illnesses`.
 
 ### PATCH /cats/:id
 
-**Request (all fields optional):**
+**Request (all fields optional; `ownerId` reassigns or `null` unassigns):**
 
 ```json
-{ "age": 4 }
+{ "age": 4, "ownerId": null }
 ```
 
 ### DELETE /cats/:id
@@ -171,15 +169,132 @@ Get a token via `POST /auth/login` or `POST /auth/register`.
 
 ---
 
+## Owners (requires Bearer token, scoped to authenticated user)
+
+Owners are the people who own the cats, managed per user.
+
+### GET /owners
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": 2,
+    "name": "Alice",
+    "phone": "555-0100",
+    "address": "1 Cat St",
+    "userId": 1,
+    "createdAt": "...",
+    "updatedAt": "..."
+  }
+]
+```
+
+### POST /owners
+
+**Request (`phone`/`address` optional):**
+
+```json
+{
+  "name": "Alice",
+  "phone": "555-0100",
+  "address": "1 Cat St"
+}
+```
+
+**Response (201):** The owner object, including its `cats`.
+
+### GET /owners/:id
+
+**Response (200):** The owner object with its `cats`.
+
+### GET /owners/:id/cats
+
+**Response (200):** Array of the owner's cats, each with `owner` and
+`illnesses`.
+
+### PATCH /owners/:id
+
+**Request (all fields optional):**
+
+```json
+{ "phone": "555-0101" }
+```
+
+### DELETE /owners/:id
+
+Deletes the owner; their cats are kept but `ownerId` is set to `null`.
+
+**Response:** `204 No Content`
+
+---
+
+## Illnesses (requires Bearer token, nested under cats)
+
+Illnesses are a cat's medical conditions. All routes are scoped to the
+authenticated user via the cat.
+
+### POST /cats/:catId/illnesses
+
+**Request (`description`/`diagnosedAt` optional; `diagnosedAt` is an ISO date):**
+
+```json
+{
+  "name": "Flu",
+  "description": "Mild",
+  "diagnosedAt": "2026-08-01T00:00:00.000Z"
+}
+```
+
+**Response (201):** The illness object, including its `cat`.
+
+### GET /cats/:catId/illnesses
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Flu",
+    "description": "Mild",
+    "diagnosedAt": "2026-08-01T00:00:00.000Z",
+    "catId": 1,
+    "userId": 1,
+    "createdAt": "...",
+    "updatedAt": "..."
+  }
+]
+```
+
+### GET /cats/:catId/illnesses/:id
+
+**Response (200):** Single illness object, including its `cat`.
+
+### PATCH /cats/:catId/illnesses/:id
+
+**Request (all fields optional):**
+
+```json
+{ "description": "Recovering" }
+```
+
+### DELETE /cats/:catId/illnesses/:id
+
+**Response:** `204 No Content`
+
+---
+
 ## Error Responses
 
-| Status | Meaning                                              |
-| ------ | ---------------------------------------------------- |
-| 400    | Validation error (bad request body)                  |
-| 401    | Missing or invalid token                             |
-| 403    | Access denied (e.g. accessing another user's cat)    |
-| 404    | Resource not found                                   |
-| 409    | Conflict (e.g. duplicate email)                      |
+| Status | Meaning                                                   |
+| ------ | --------------------------------------------------------- |
+| 400    | Validation error (bad request body)                       |
+| 401    | Missing or invalid token                                  |
+| 403    | Access denied (e.g. another user's cat/owner/illness)     |
+| 404    | Resource not found                                        |
+| 409    | Conflict (e.g. duplicate email)                           |
 
 ---
 

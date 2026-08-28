@@ -13,4 +13,8 @@ export class UpdateCatDto {
   @IsOptional()
   @IsString()
   breed?: string;
+
+  @IsOptional()
+  @IsInt()
+  ownerId?: number;
 }
