@@ -33,7 +33,9 @@ cp .env.example .env   # update DATABASE_URL, JWT_SECRET
 ### 3. Run migrations
 
 ```bash
-npx prisma migrate dev --name init
+npm run db:deploy        # safe: applies committed migrations
+# or, during active development against a dev DB:
+PRISMA_ALLOW_DESTRUCTIVE=1 npm run db:migrate:dev
 ```
 
 ### 4. Start dev server
@@ -74,13 +76,21 @@ See [API.md](./API.md) for full testing guide with Postman/Hoppscotch.
 
 ```
 src/
-├── main.ts                  # Bootstrap + global pipes
-├── app.module.ts            # Root module
+├── main.ts                  # Bootstrap + global pipes, filter, helmet, CORS
+├── app.module.ts            # Root module + global middleware
 ├── prisma/                  # Database layer (global)
 ├── auth/                    # JWT authentication
 ├── users/                   # User CRUD
 └── cats/                    # Per-user cats CRUD
 ```
+
+## Safety Guards
+
+- **Husky hooks** block commits/pushes on `main`/`master` and run `lint` + `build` on commit.
+- **Prisma destructive commands** (`db:migrate:dev`, `db:reset`, `db:push`) are guarded by `scripts/guard-destructive-db.sh` and refused unless `PRISMA_ALLOW_DESTRUCTIVE=1` is set (and never when `APP_ENV`/`NODE_ENV=production`).
+- **E2E tests** refuse to run unless `DATABASE_URL` points at a test database (see `test/global-setup.js`).
+
+See [AGENTS.md](./AGENTS.md) for the full contribution and safety guide.
 
 ## License
 
