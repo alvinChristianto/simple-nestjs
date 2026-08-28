@@ -7,7 +7,9 @@ Guidance for AI agents and human contributors working in this repository.
 RESTful NestJS 11 API with:
 - JWT authentication (Passport + bcrypt)
 - User management
-- Per-user cats CRUD
+- Per-user owners CRUD (cat owners)
+- Per-user cats CRUD (cat patients)
+- Nested illnesses CRUD under cats
 - PostgreSQL via Prisma ORM
 
 ## Environment & Commands
@@ -41,7 +43,9 @@ src/
 ├── prisma/          # global PrismaModule + PrismaService (lifecycle hooks)
 ├── auth/            # JWT auth module (controller, service, strategy, guard, DTOs)
 ├── users/           # user CRUD
+├── owners/          # per-user cat owners CRUD
 ├── cats/            # per-user cats CRUD
+├── illnesses/       # nested illnesses CRUD under cats
 └── common/          # cross-cutting: decorators, filters, middleware
 ```
 
@@ -66,10 +70,11 @@ src/
 - **Security**: `helmet()` + `enableCors()` in `main.ts`. **Secrets come from `@nestjs/config` (`ConfigService`)** — never read `process.env` directly in modules (see `auth.module.ts` / `jwt.strategy.ts` using `ConfigService.getOrThrow`).
 - **Config**: add new env vars to `.env.example` and read them via `ConfigService`.
 
-### Guarding `/users` and `/cats`
+### Guarding `/users`, `/cats`, `/owners`, and `/illnesses`
 
-- Both the `UsersController` and `CatsController` are protected by `JwtAuthGuard` (Bearer token).
-- `CatsService` scopes every query to the authenticated user; do not bypass the ownership check.
+- `UsersController`, `CatsController`, `OwnersController`, and `IllnessesController` are all protected by `JwtAuthGuard` (Bearer token).
+- `CatsService`, `OwnersService`, and `IllnessesService` scope every query to the authenticated user; do not bypass the ownership checks.
+- Illnesses are nested under cats (`/cats/:catId/illnesses`); access is verified at both the cat and illness levels.
 
 ## Git Workflow Rules (MANDATORY)
 
