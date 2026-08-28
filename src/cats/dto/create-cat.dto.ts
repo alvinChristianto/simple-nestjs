@@ -1,4 +1,4 @@
-import { IsInt, IsString, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateCatDto {
   @IsString()
@@ -10,4 +10,8 @@ export class CreateCatDto {
 
   @IsString()
   breed: string;
+
+  @IsOptional()
+  @IsInt()
+  ownerId?: number;
 }

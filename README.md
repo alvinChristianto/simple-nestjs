@@ -1,6 +1,12 @@
 # Simple NestJS API
 
-RESTful API with JWT authentication, user management, and per-user cats CRUD.
+RESTful API with JWT authentication, admin user management, and per-admin CRUD for
+cat patients, their owners, and cat illnesses.
+
+- **User** = admin (everything is scoped to the authenticated admin).
+- **Cat** = the patient (belongs to an admin and optionally an owner).
+- **Owner** = the person who owns the cat; one owner can have many cats.
+- **Illness** = a cat's medical condition; one cat can have many illnesses.
 
 ## Tech Stack
 
@@ -54,19 +60,30 @@ http://localhost:3000/api/v1
 
 ## Endpoints
 
-| Method | Route                  | Auth | Description           |
-|--------|------------------------|------|-----------------------|
-| POST   | `/auth/register`       | No   | Create account        |
-| POST   | `/auth/login`          | No   | Get JWT token         |
-| GET    | `/users`               | Yes  | List all users        |
-| GET    | `/users/:id`           | Yes  | Get user + their cats |
-| PATCH  | `/users/:id`           | Yes  | Update user           |
-| DELETE | `/users/:id`           | Yes  | Delete user           |
-| GET    | `/cats`                | Yes  | List own cats         |
-| POST   | `/cats`                | Yes  | Create a cat          |
-| GET    | `/cats/:id`            | Yes  | Get own cat           |
-| PATCH  | `/cats/:id`            | Yes  | Update own cat        |
-| DELETE | `/cats/:id`            | Yes  | Delete own cat        |
+| Method | Route                        | Auth | Description                   |
+|--------|------------------------------|------|-------------------------------|
+| POST   | `/auth/register`             | No   | Create account                |
+| POST   | `/auth/login`                | No   | Get JWT token                 |
+| GET    | `/users`                     | Yes  | List all users                |
+| GET    | `/users/:id`                 | Yes  | Get user + their cats         |
+| PATCH  | `/users/:id`                 | Yes  | Update user                   |
+| DELETE | `/users/:id`                 | Yes  | Delete user                   |
+| GET    | `/owners`                    | Yes  | List own owners               |
+| POST   | `/owners`                    | Yes  | Create an owner               |
+| GET    | `/owners/:id`                | Yes  | Get own owner + their cats    |
+| GET    | `/owners/:id/cats`           | Yes  | List an owner's cats          |
+| PATCH  | `/owners/:id`                | Yes  | Update own owner              |
+| DELETE | `/owners/:id`                | Yes  | Delete own owner              |
+| GET    | `/cats`                      | Yes  | List own cats                 |
+| POST   | `/cats`                      | Yes  | Create a cat                  |
+| GET    | `/cats/:id`                  | Yes  | Get own cat                   |
+| PATCH  | `/cats/:id`                  | Yes  | Update own cat                |
+| DELETE | `/cats/:id`                  | Yes  | Delete own cat                |
+| GET    | `/cats/:catId/illnesses`     | Yes  | List a cat's illnesses        |
+| POST   | `/cats/:catId/illnesses`     | Yes  | Add an illness to a cat       |
+| GET    | `/cats/:catId/illnesses/:id` | Yes  | Get one illness               |
+| PATCH  | `/cats/:catId/illnesses/:id` | Yes  | Update an illness             |
+| DELETE | `/cats/:catId/illnesses/:id` | Yes  | Delete an illness             |
 
 ## Testing the API
 
@@ -80,8 +97,10 @@ src/
 ├── app.module.ts            # Root module + global middleware
 ├── prisma/                  # Database layer (global)
 ├── auth/                    # JWT authentication
-├── users/                   # User CRUD
-└── cats/                    # Per-user cats CRUD
+├── users/                   # Admin user CRUD
+├── owners/                  # Cat owners CRUD (scoped per admin)
+├── cats/                    # Cat patients CRUD (scoped per admin)
+└── illnesses/               # Cat illnesses CRUD (nested under /cats)
 ```
 
 ## Safety Guards

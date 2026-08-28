@@ -8,24 +8,60 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
   name      String
   password  String
   cats      Cat[]
+  owners    Owner[]
+  illnesses Illness[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Owner {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  address   String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  cats      Cat[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Cat {
-  id        Int      @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   name      String
   age       Int
   breed     String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  owner     Owner?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerId   Int?
+  illnesses Illness[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
+  @@index([userId])
+  @@index([ownerId])
+}
+
+model Illness {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  diagnosedAt DateTime?
+  cat         Cat      @relation(fields: [catId], references: [id], onDelete: Cascade)
+  catId       Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([catId])
   @@index([userId])
 }
