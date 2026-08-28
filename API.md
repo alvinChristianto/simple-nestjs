@@ -12,6 +12,28 @@ Authorization: Bearer <your_token>
 
 Get a token via `POST /auth/login` or `POST /auth/register`.
 
+## Roles & Authorization
+
+Authorization is enforced with CASL. Roles are read from the database on every
+request (`JwtStrategy.validate`), never from the JWT, and `register` always
+creates a `USER`.
+
+| Role        | Access                                                                                                    |
+|-------------|-----------------------------------------------------------------------------------------------------------|
+| USER        | Read/Create/Update/Delete **own** cats, owners, illnesses; read **own** profile (`id`/`email`/`name` only) |
+| ADMIN       | Read/Create/Update all users, cats, owners, illnesses (users: limited fields); **cannot delete any record** |
+| SUPER_ADMIN | Full `manage` over everything, including deletes and role assignment                                       |
+
+Routing rules:
+
+- `/users` is guarded by `@CheckPolicies` — only ADMIN/SUPER_ADMIN can create,
+  update (including `role`), or delete users. `DELETE` returns `403` for ADMIN
+  (delete is SUPER_ADMIN only). A USER calling `GET /users` sees only their own
+  row and gets `403` on write/delete endpoints.
+- Cats, owners, and illnesses are checked in the services against the actual
+  row (`subject(...)`). USERs are scoped to their own records; ADMINs see all
+  records but `DELETE` returns `403`; SUPER_ADMINs can do everything.
+
 ---
 
 ## Auth
@@ -60,7 +82,12 @@ Get a token via `POST /auth/login` or `POST /auth/register`.
 
 ---
 
-## Users (requires Bearer token)
+## Users (requires Bearer token; role-aware)
+
+Access rules: `GET` routes are reachable by any authenticated user (a USER only
+ever sees their own row). `POST /users`, `PATCH /users/:id`, and `DELETE /users/:id`
+are ADMIN/SUPER_ADMIN only. `role` may be assigned via `POST`/`PATCH`; it is
+never accepted by `register`/`login`.
 
 ### GET /users
 
@@ -72,10 +99,26 @@ Get a token via `POST /auth/login` or `POST /auth/register`.
     "id": 1,
     "email": "john@example.com",
     "name": "John",
+    "role": "USER",
     "createdAt": "2026-08-27T..."
   }
 ]
 ```
+
+### POST /users
+
+**Request (`role` optional, must be one of `USER`/`ADMIN`/`SUPER_ADMIN`):**
+
+```json
+{
+  "email": "jane@example.com",
+  "name": "Jane",
+  "password": "secret123",
+  "role": "ADMIN"
+}
+```
+
+**Response (201):** The new user object (`id`, `email`, `name`, `role`, `createdAt`).
 
 ### GET /users/:id
 
@@ -86,6 +129,7 @@ Get a token via `POST /auth/login` or `POST /auth/register`.
   "id": 1,
   "email": "john@example.com",
   "name": "John",
+  "role": "USER",
   "createdAt": "2026-08-27T...",
   "cats": [
     { "id": 1, "name": "Whiskers", "age": 3, "breed": "Persian" }
@@ -95,13 +139,15 @@ Get a token via `POST /auth/login` or `POST /auth/register`.
 
 ### PATCH /users/:id
 
-**Request (all fields optional):**
+**Request (all fields optional; `role` optional):**
 
 ```json
-{ "name": "John Updated" }
+{ "name": "John Updated", "role": "USER" }
 ```
 
 ### DELETE /users/:id
+
+ADMIN gets `403`; only SUPER_ADMIN can delete users.
 
 **Response:** `204 No Content`
 
@@ -292,7 +338,7 @@ authenticated user via the cat.
 | ------ | --------------------------------------------------------- |
 | 400    | Validation error (bad request body)                       |
 | 401    | Missing or invalid token                                  |
-| 403    | Access denied (e.g. another user's cat/owner/illness)     |
+| 403    | Access denied (another user's row, ADMIN delete, etc.)    |
 | 404    | Resource not found                                        |
 | 409    | Conflict (e.g. duplicate email)                           |
 

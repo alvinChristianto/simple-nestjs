@@ -3,8 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { subject } from '@casl/ability';
+import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { CaslAbilityFactory } from '../ability/casl-ability.factory';
+import { Action } from '../ability/ability.types';
+import type { AppAbility, AuthUser, Subjects } from '../ability/ability.types';
 import { CreateCatDto } from './dto/create-cat.dto';
 import { UpdateCatDto } from './dto/update-cat.dto';
 
@@ -15,11 +19,17 @@ export class CatsService {
     illnesses: { orderBy: { createdAt: 'desc' } },
   };
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly caslAbilityFactory: CaslAbilityFactory,
+  ) {}
 
-  async create(userId: number, dto: CreateCatDto) {
+  async create(user: AuthUser, dto: CreateCatDto) {
+    const ability = this.caslAbilityFactory.createForUser(user);
+    this.assert(ability, Action.Create, 'Cat');
+
     if (dto.ownerId != null) {
-      await this.verifyOwnerAccess(dto.ownerId, userId);
+      await this.verifyOwnerAccess(dto.ownerId, user, ability);
     }
 
     return this.prisma.cat.create({
@@ -28,21 +38,29 @@ export class CatsService {
         age: dto.age,
         breed: dto.breed,
         ownerId: dto.ownerId,
-        userId,
+        userId: user.id,
       },
       include: this.include,
     });
   }
 
-  async findAllByUser(userId: number) {
-    return this.prisma.cat.findMany({
-      where: { userId },
+  async findAllByUser(user: AuthUser) {
+    const ability = this.caslAbilityFactory.createForUser(user);
+    this.assert(ability, Action.Read, 'Cat');
+
+    const cats = await this.prisma.cat.findMany({
+      where: user.role === Role.USER ? { userId: user.id } : undefined,
       orderBy: { createdAt: 'desc' },
       include: this.include,
     });
+
+    return cats.filter((cat) => ability.can(Action.Read, subject('Cat', cat)));
   }
 
-  async findOneByUser(id: number, userId: number) {
+  async findOneByUser(id: number, user: AuthUser) {
+    const ability = this.caslAbilityFactory.createForUser(user);
+    this.assert(ability, Action.Read, 'Cat');
+
     const cat = await this.prisma.cat.findUnique({
       where: { id },
       include: this.include,
@@ -52,18 +70,17 @@ export class CatsService {
       throw new NotFoundException(`Cat #${id} not found`);
     }
 
-    if (cat.userId !== userId) {
-      throw new ForbiddenException('Access denied');
-    }
-
+    this.assert(ability, Action.Read, subject('Cat', cat));
     return cat;
   }
 
-  async updateByUser(id: number, userId: number, dto: UpdateCatDto) {
-    await this.findOneByUser(id, userId);
+  async updateByUser(id: number, user: AuthUser, dto: UpdateCatDto) {
+    const ability = this.caslAbilityFactory.createForUser(user);
+    const cat = await this.findOneByUser(id, user);
+    this.assert(ability, Action.Update, subject('Cat', cat));
 
     if (dto.ownerId != null) {
-      await this.verifyOwnerAccess(dto.ownerId, userId);
+      await this.verifyOwnerAccess(dto.ownerId, user, ability);
     }
 
     return this.prisma.cat.update({
@@ -73,13 +90,19 @@ export class CatsService {
     });
   }
 
-  async removeByUser(id: number, userId: number) {
-    await this.findOneByUser(id, userId);
+  async removeByUser(id: number, user: AuthUser) {
+    const ability = this.caslAbilityFactory.createForUser(user);
+    const cat = await this.findOneByUser(id, user);
+    this.assert(ability, Action.Delete, subject('Cat', cat));
 
     return this.prisma.cat.delete({ where: { id } });
   }
 
-  private async verifyOwnerAccess(ownerId: number, userId: number) {
+  private async verifyOwnerAccess(
+    ownerId: number,
+    user: AuthUser,
+    ability: AppAbility,
+  ) {
     const owner = await this.prisma.owner.findUnique({
       where: { id: ownerId },
     });
@@ -88,7 +111,16 @@ export class CatsService {
       throw new NotFoundException(`Owner #${ownerId} not found`);
     }
 
-    if (owner.userId !== userId) {
+    this.assert(ability, Action.Read, subject('Owner', owner));
+    this.assert(ability, Action.Update, subject('Owner', owner));
+  }
+
+  private assert(
+    ability: AppAbility,
+    action: Action,
+    resource: Subjects,
+  ): void {
+    if (!ability.can(action, resource)) {
       throw new ForbiddenException('Access denied');
     }
   }

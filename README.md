@@ -1,10 +1,16 @@
 # Simple NestJS API
 
-RESTful API with JWT authentication, admin user management, and per-admin CRUD for
-cat patients, their owners, and cat illnesses.
+RESTful API with JWT authentication and role-based access control (RBAC) for
+cat patients, their owners, and cat illnesses. Authorization is enforced with
+[CASL](https://casl.js.org) using route-level guards plus object-level checks in
+the services.
 
-- **User** = admin (everything is scoped to the authenticated admin).
-- **Cat** = the patient (belongs to an admin and optionally an owner).
+- **USER** = regular user; full CRUD over their *own* cats/owners/illnesses and
+  read access to their own profile.
+- **ADMIN** = can read/create/update all users, cats, owners, and illnesses, but
+  **cannot delete** any record.
+- **SUPER_ADMIN** = full `manage` access over everything.
+- **Cat** = the patient (belongs to a user and optionally an owner).
 - **Owner** = the person who owns the cat; one owner can have many cats.
 - **Illness** = a cat's medical condition; one cat can have many illnesses.
 
@@ -62,32 +68,56 @@ http://localhost:3000/api/v1
 
 | Method | Route                        | Auth | Description                   |
 |--------|------------------------------|------|-------------------------------|
-| POST   | `/auth/register`             | No   | Create account                |
+| POST   | `/auth/register`             | No   | Create account (always `USER`)|
 | POST   | `/auth/login`                | No   | Get JWT token                 |
-| GET    | `/users`                     | Yes  | List all users                |
-| GET    | `/users/:id`                 | Yes  | Get user + their cats         |
-| PATCH  | `/users/:id`                 | Yes  | Update user                   |
-| DELETE | `/users/:id`                 | Yes  | Delete user                   |
-| GET    | `/owners`                    | Yes  | List own owners               |
-| POST   | `/owners`                    | Yes  | Create an owner               |
-| GET    | `/owners/:id`                | Yes  | Get own owner + their cats    |
-| GET    | `/owners/:id/cats`           | Yes  | List an owner's cats          |
-| PATCH  | `/owners/:id`                | Yes  | Update own owner              |
-| DELETE | `/owners/:id`                | Yes  | Delete own owner              |
-| GET    | `/cats`                      | Yes  | List own cats                 |
-| POST   | `/cats`                      | Yes  | Create a cat                  |
-| GET    | `/cats/:id`                  | Yes  | Get own cat                   |
-| PATCH  | `/cats/:id`                  | Yes  | Update own cat                |
-| DELETE | `/cats/:id`                  | Yes  | Delete own cat                |
-| GET    | `/cats/:catId/illnesses`     | Yes  | List a cat's illnesses        |
-| POST   | `/cats/:catId/illnesses`     | Yes  | Add an illness to a cat       |
-| GET    | `/cats/:catId/illnesses/:id` | Yes  | Get one illness               |
-| PATCH  | `/cats/:catId/illnesses/:id` | Yes  | Update an illness             |
-| DELETE | `/cats/:catId/illnesses/:id` | Yes  | Delete an illness             |
+| GET    | `/users`                     | Yes  | List users (ADMIN+); USER sees self |
+| GET    | `/users/:id`                 | Yes  | Get user + their cats (ADMIN+); USER sees self |
+| POST   | `/users`                     | Yes  | Create user with optional role (ADMIN+) |
+| PATCH  | `/users/:id`                 | Yes  | Update user / assign role (ADMIN+) |
+| DELETE | `/users/:id`                 | Yes  | Delete user (SUPER_ADMIN only) |
+| GET    | `/owners`                    | Yes  | List owners (scoped to USER; all for ADMIN+) |
+| POST   | `/owners`                    | Yes  | Create an owner                |
+| GET    | `/owners/:id`                | Yes  | Get owner + their cats         |
+| GET    | `/owners/:id/cats`           | Yes  | List an owner's cats           |
+| PATCH  | `/owners/:id`                | Yes  | Update own owner               |
+| DELETE | `/owners/:id`                | Yes  | Delete own owner (ADMIN blocked) |
+| GET    | `/cats`                      | Yes  | List cats (scoped to USER; all for ADMIN+) |
+| POST   | `/cats`                      | Yes  | Create a cat                   |
+| GET    | `/cats/:id`                  | Yes  | Get cat                        |
+| PATCH  | `/cats/:id`                  | Yes  | Update cat                     |
+| DELETE | `/cats/:id`                  | Yes  | Delete cat (ADMIN blocked)     |
+| GET    | `/cats/:catId/illnesses`     | Yes  | List a cat's illnesses         |
+| POST   | `/cats/:catId/illnesses`     | Yes  | Add an illness to a cat        |
+| GET    | `/cats/:catId/illnesses/:id` | Yes  | Get one illness                |
+| PATCH  | `/cats/:catId/illnesses/:id` | Yes  | Update an illness              |
+| DELETE | `/cats/:catId/illnesses/:id` | Yes  | Delete an illness (ADMIN blocked) |
 
 ## Testing the API
 
 See [API.md](./API.md) for full testing guide with Postman/Hoppscotch.
+
+## Roles & Access Control
+
+Roles are stored on the `User` record and read from the database on every
+request by the JWT strategy — the token is never trusted for authorization.
+New accounts are always created as `USER`.
+
+| Role        | Access                                                                                                    |
+|-------------|-----------------------------------------------------------------------------------------------------------|
+| USER        | Read/Create/Update/Delete own cats, owners, illnesses; read own profile (id/email/name only)              |
+| ADMIN       | Read/Create/Update all users/pets; **cannot delete** anything                                            |
+| SUPER_ADMIN | Can do everything, including deletes and role assignment                                                 |
+
+To promote your first admin, update the record directly against a dev DB (see
+your README bootstrap step in the plan) or create users with a role via
+`POST /users` once a SUPER_ADMIN exists:
+
+```sql
+UPDATE "User" SET role='SUPER_ADMIN' WHERE email='you@example.com';
+```
+
+Role assignment never happens through `register`/`login`; it is only possible
+via the policy-guarded `/users` endpoints.
 
 ## Project Structure
 
@@ -96,10 +126,11 @@ src/
 ├── main.ts                  # Bootstrap + global pipes, filter, helmet, CORS
 ├── app.module.ts            # Root module + global middleware
 ├── prisma/                  # Database layer (global)
+├── ability/                 # CASL: ability factory, policies guard, types (global)
 ├── auth/                    # JWT authentication
-├── users/                   # Admin user CRUD
-├── owners/                  # Cat owners CRUD (scoped per admin)
-├── cats/                    # Cat patients CRUD (scoped per admin)
+├── users/                   # User CRUD (policy-guarded, role-aware DTOs)
+├── owners/                  # Cat owners CRUD (protected by ability checks)
+├── cats/                    # Cat patients CRUD (protected by ability checks)
 └── illnesses/               # Cat illnesses CRUD (nested under /cats)
 ```
 

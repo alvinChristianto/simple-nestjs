@@ -9,11 +9,13 @@ import { CatsModule } from './cats/cats.module';
 import { OwnersModule } from './owners/owners.module';
 import { IllnessesModule } from './illnesses/illnesses.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { AbilityModule } from './ability/ability.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    AbilityModule,
     AuthModule,
     UsersModule,
     CatsModule,
